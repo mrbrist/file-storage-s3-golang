@@ -1,10 +1,14 @@
 package main
 
 import (
+	"crypto/rand"
 	"encoding/base64"
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/auth"
 	"github.com/google/uuid"
@@ -44,11 +48,11 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	imageData, err := io.ReadAll(file)
-	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "Error reading image data", err)
-		return
-	}
+	// imageData, err := io.ReadAll(file)
+	// if err != nil {
+	// 	respondWithError(w, http.StatusBadRequest, "Error reading image data", err)
+	// 	return
+	// }
 
 	video, err := cfg.db.GetVideo(videoID)
 	if err != nil {
@@ -60,13 +64,33 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		respondWithError(w, http.StatusUnauthorized, "You do not own this video", err)
 		return
 	}
-	newThumbnail := thumbnail{
-		data:      imageData,
-		mediaType: fileHeader.Header.Get("Content-Type"),
+	// newThumbnail := thumbnail{
+	// 	data:      imageData,
+	// 	mediaType: fileHeader.Header.Get("Content-Type"),
+	// }
+
+	r32 := make([]byte, 32)
+	rand.Read(r32)
+	rand_url := base64.RawURLEncoding.EncodeToString(r32)
+
+	file_extension := strings.Replace(fileHeader.Header.Get("Content-Type"), "image/", "", 1)
+
+	// b64_img := base64.StdEncoding.EncodeToString(newThumbnail.data)
+	thumb_path := filepath.Join(cfg.assetsRoot, fmt.Sprintf("%s.%s", rand_url, file_extension))
+	new_file, err := os.Create(thumb_path)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Error saving file", err)
+		return
 	}
-	b64_img := base64.StdEncoding.EncodeToString(newThumbnail.data)
-	data_url := fmt.Sprintf("data:%s;base64,%s", newThumbnail.mediaType, b64_img)
-	video.ThumbnailURL = &data_url
+
+	_, err = io.Copy(new_file, file)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Error saving file", err)
+		return
+	}
+
+	url := fmt.Sprintf("http://localhost:%s/assets/%s.%s", cfg.port, rand_url, file_extension)
+	video.ThumbnailURL = &url
 	err = cfg.db.UpdateVideo(video)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Error updating video", err)
