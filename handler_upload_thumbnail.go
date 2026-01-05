@@ -47,12 +47,7 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		respondWithError(w, http.StatusBadRequest, "No thumbnail found", err)
 		return
 	}
-
-	// imageData, err := io.ReadAll(file)
-	// if err != nil {
-	// 	respondWithError(w, http.StatusBadRequest, "Error reading image data", err)
-	// 	return
-	// }
+	defer file.Close()
 
 	video, err := cfg.db.GetVideo(videoID)
 	if err != nil {
@@ -64,10 +59,6 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		respondWithError(w, http.StatusUnauthorized, "You do not own this video", err)
 		return
 	}
-	// newThumbnail := thumbnail{
-	// 	data:      imageData,
-	// 	mediaType: fileHeader.Header.Get("Content-Type"),
-	// }
 
 	r32 := make([]byte, 32)
 	rand.Read(r32)
